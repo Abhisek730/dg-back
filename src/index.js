@@ -6,13 +6,14 @@ const cors = require("cors");
 const productRoutes = require('./routes/productRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const categoryRoutes = require("./routes/categoryRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
 const checkoutRoutes = require("./routes/checkOutRoutes")
+const paymentRoutes = require('./routes/paymentRoutes');
+
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3007;
 
 // Middleware
 app.use(cors())
@@ -40,6 +41,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use("/api/checkout",checkoutRoutes)
+app.use('/api/payment', paymentRoutes);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
