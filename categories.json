@@ -1,0 +1,11 @@
+[
+    { "name": "Scrum and Agile", "description": "Training programs for Scrum and Agile methodologies" },
+    { "name": "Project Management", "description": "Courses covering project management best practices" },
+    { "name": "Six Sigma and Quality", "description": "Six Sigma certifications and quality management courses" },
+    { "name": "IT Service Management – ITIL ®", "description": "ITIL® frameworks and IT service management courses" },
+    { "name": "SDI – Service Desk Manager", "description": "Service Desk and support management training" },
+    { "name": "SIAM", "description": "Courses related to Service Integration and Management (SIAM)" },
+    { "name": "ISO Trainings", "description": "Training programs based on ISO standards" },
+    { "name": "Devops Institute - DOI", "description": "DevOps certifications and trainings offered by DevOps Institute" }
+  ]
+  

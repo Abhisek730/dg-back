@@ -15,7 +15,7 @@ const contactRoutes = require ('./routes/Contact')
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3007;
+const port = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors())

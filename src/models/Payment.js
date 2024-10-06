@@ -2,12 +2,27 @@ const mongoose = require('mongoose');
 
 const paymentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', },
-  razorpayOrderId: { type: String, },
+  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true }, // Required as payments should be linked to orders
+  razorpayOrderId: { type: String, required: true }, // Razorpay order ID for reference
+  razorpayPaymentId: { type: String }, // Store Razorpay payment ID when payment is made
+  razorpaySignature: { type: String }, // Store Razorpay signature for security validation
   
-  amount: { type: Number, },
-  status: { type: String, required: true }, // 'created', 'paid', 'failed'
-  createdAt: { type: Date, default: Date.now }
+  amount: { type: Number, required: true }, // Amount must be required to ensure it's always specified
+  status: { 
+    type: String, 
+    required: true, 
+    enum: ['created', 'paid', 'failed'], // Restrict to these statuses
+    default: 'created' // Default to 'created' when the payment is initiated
+  },
+  
+  createdAt: { type: Date, default: Date.now },
+  modifiedAt: { type: Date } // Optional field to track updates
+});
+
+// Pre-save hook to update the modifiedAt field
+paymentSchema.pre('save', function(next) {
+  this.modifiedAt = Date.now();
+  next();
 });
 
 const Payment = mongoose.model('Payment', paymentSchema);
