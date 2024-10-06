@@ -9,7 +9,8 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const checkoutRoutes = require("./routes/checkOutRoutes")
 const paymentRoutes = require('./routes/paymentRoutes');
 const webinarRoutes = require('./routes/webinarRoutes');
-const contactRoutes = require ('./routes/Contact')
+const contactRoutes = require('./routes/Contact');
+const orderRoutes = require("./routes/orderRoutes")
 
 
 dotenv.config();
@@ -43,11 +44,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use("/api/checkout",checkoutRoutes)
+app.use("/api/checkout", checkoutRoutes)
 app.use('/api/payment', paymentRoutes);
 app.use('/webinars', webinarRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/get-in-touch', getInTouchRoute);
+app.use('/api', orderRoutes);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);

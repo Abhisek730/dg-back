@@ -75,7 +75,7 @@ router.post('/order', async (req, res) => {
 });
 
 
-// ROUTE 2 : Create Verify Api Using POST Method http://localhost:4000/api/payment/verify
+
 router.post('/verify', async (req, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, orderId } = req.body;
 
@@ -85,6 +85,8 @@ router.post('/verify', async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+
+        // Create HMAC signature to verify the payment
         const sign = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSign = crypto.createHmac("sha256", process.env.RAZORPAY_SECRET_KEY)
             .update(sign.toString())
@@ -92,15 +94,29 @@ router.post('/verify', async (req, res) => {
 
         // Verify the authenticity of the payment
         if (expectedSign === razorpay_signature) {
-            // Find the order by its ID and update its status
+            // Find the order by its ID
             const order = await Order.findById(orderId);
             if (!order) return res.status(404).json({ message: "Order not found" });
 
+            // Step 1: Create a new payment entry in the Payment model
+            const payment = new Payment({
+                razorpayOrderId: razorpay_order_id,
+                razorpayPaymentId: razorpay_payment_id,
+                amount: order.total,
+                userId: userId,
+                status: 'paid'
+            });
+
+            // Save the payment and get the payment ID
+            const savedPayment = await payment.save();
+
+            // Step 2: Update the order with the payment ID and mark as completed
             order.paymentStatus = 'Paid';
             order.status = 'Completed';
+            order.paymentId = savedPayment._id; // Add the payment ID to the order
             await order.save();
 
-            // Clear the user's cart after the order is completed
+            // Step 3: Clear the user's cart after the order is completed
             const cart = await Cart.findOne({ userId: userId });
             if (cart) {
                 cart.items = [];
@@ -113,7 +129,7 @@ router.post('/verify', async (req, res) => {
             // Respond with success
             res.json({
                 success: true,
-                message: "Payment Successfully Verified",
+                message: "Payment Successfully Verified and Order Completed",
                 order
             });
         } else {
@@ -125,6 +141,5 @@ router.post('/verify', async (req, res) => {
         console.error(error);
     }
 });
-
 
 module.exports = router;
