@@ -1,124 +1,130 @@
 const express = require('express');
 const router = express.Router();
 const Razorpay = require('razorpay');
+const crypto = require('crypto');
+require('dotenv').config();
 const Payment = require('../models/Payment');
 const Cart = require('../models/Cart');
 const Order = require('../models/Order');
+const User = require("../models/User");
 const { sendOrderConfirmationEmail } = require('../utils/sendOrderConfirmationEmail');
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
+
 
 const razorpayInstance = new Razorpay({
     key_id: RAZORPAY_ID_KEY,
     key_secret: RAZORPAY_SECRET_KEY
 });
 
-// Route 1: Initiate Payment
-router.post('/createPayment', async (req, res) => {
-    try {
-        const { userId, amount, items } = req.body;
+// ROUTE 1 : Create Order Api Using POST Method http://localhost:4000/api/payment/order
+// ROUTE 1 : Create Order Api Using POST Method
+router.post('/order', async (req, res) => {
+    const { amount, userId, items } = req.body;
 
-        // Validate input
-        if (!userId || !amount || !items || items.length === 0) {
-            return res.status(400).json({ success: false, msg: 'Invalid input data' });
+    try {
+        if (!amount || !items || !userId) {
+            return res.status(400).json({ message: "Invalid input data" });
         }
 
-        // Create a Razorpay order
+        // Calculate subtotal by summing up the totalPrice of each item
+        const subtotal = items.reduce((acc, item) => acc + (item.region_price * item.quantity), 0);
+
+        // Add any shipping and tax here (as an example, flat shipping rate and 5% tax)
+        const shipping = 50;
+        const tax = subtotal * 0.05;
+        const total = subtotal + shipping + tax;
+
+        // Create the order options for Razorpay
         const options = {
-            amount: amount * 100, // Amount in paise (Razorpay expects this)
-            currency: 'INR',
-            receipt: `receipt_order_${new Date().getTime()}`
+            amount: Number(total * 100), // Amount in paise (Razorpay expects this)
+            currency: "INR",
+            receipt: crypto.randomBytes(10).toString("hex"), // Generate a random receipt number
         };
 
-        razorpayInstance.orders.create(options, async (err, order) => {
-            if (!err) {
-                // Create a new payment entry in the database
-                const newPayment = new Payment({
-                    userId,
-                    razorpayOrderId: order.id,
-                    amount,
-                    status: 'created' // Initial status
-                });
-
-                await newPayment.save();
-
-                res.status(200).json({
-                    success: true,
-                    orderId: order.id,
-                    amount: amount,
-                    key_id: RAZORPAY_ID_KEY
-                });
-            } else {
-                console.error(err);
-                res.status(400).json({ success: false, msg: 'Failed to create Razorpay order' });
-            }
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, msg: 'Internal Server Error' });
-    }
-});
-
-// Route 2: Complete Payment and Create Order
-router.post('/completePayment', async (req, res) => {
-    try {
-        const { razorpayOrderId, razorpayPaymentId, razorpaySignature, email } = req.body;
-
-        // Step 1: Find the payment entry by razorpayOrderId
-        const payment = await Payment.findOne({ razorpayOrderId });
-        if (!payment) return res.status(404).json({ success: false, msg: 'Payment not found' });
-
-        // Step 2: Verify the payment details (assuming Razorpay's signature verification is done here)
-        // Add Razorpay signature verification logic here if necessary
-        // ...
-
-        // Step 3: Find the user's cart and create the order
-        const cart = await Cart.findOne({ userId: payment.userId }).populate('items.product_id');
-        if (!cart || cart.items.length === 0) {
-            return res.status(404).json({ success: false, msg: 'Cart is empty' });
+        // Create the order in Razorpay
+        const order = await razorpayInstance.orders.create(options);
+        if (!order) {
+            return res.status(500).json({ message: "Something Went Wrong!" });
         }
 
-        // Step 4: Create a new order using the items in the cart
+        // Save the order in your database
         const newOrder = new Order({
-            userId: payment.userId,
-            items: cart.items.map(item => ({
+            userId,
+            items: items.map(item => ({
                 product_id: item.product_id,
                 optionTitle: item.optionTitle,
                 quantity: item.quantity,
-                totalPrice: item.totalPrice
+                region_price: item.region_price,
+                totalPrice: item.region_price * item.quantity // Calculate total price per item
             })),
-            subtotal: payment.amount,
-            status: 'Completed', // Set order status to completed
-            paymentStatus: 'Paid' // Mark payment as paid
+            subtotal: subtotal, // Add subtotal
+            total: total, // Add total
+            razorpayOrderId: order.id,
+            status: 'Pending', // Set order status as 'Pending' until payment is complete
+            paymentStatus: 'Not Paid' // Initial payment status
         });
 
         await newOrder.save();
 
-        // Step 5: Clear the user's cart after order creation
-        cart.items = [];
-        await cart.save();
-
-        // Step 6: Update the payment entry with Razorpay details and set status to 'paid'
-        payment.razorpayPaymentId = razorpayPaymentId;
-        payment.razorpaySignature = razorpaySignature;
-        payment.status = 'paid';
-        await payment.save();
-
-        // Step 7: Send the order confirmation email to the user
-        const orderDetails = {
-            _id: newOrder._id,
-            total: newOrder.subtotal,
-            items: newOrder.items,
-        };
-
-        if (email) {
-            await sendOrderConfirmationEmail(email, orderDetails);
-        }
-
-        res.status(200).json({ success: true, msg: 'Payment successful, order created, cart cleared, and confirmation email sent' });
+        // Send the order details to the frontend
+        res.status(200).json({ data: order, orderId: newOrder._id });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, msg: 'Internal Server Error' });
+        res.status(500).json({ message: "Internal Server Error!" });
+        console.log(error);
     }
 });
+
+
+// ROUTE 2 : Create Verify Api Using POST Method http://localhost:4000/api/payment/verify
+router.post('/verify', async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, orderId } = req.body;
+
+    try {
+        // Fetch user details using userId
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const sign = razorpay_order_id + "|" + razorpay_payment_id;
+        const expectedSign = crypto.createHmac("sha256", process.env.RAZORPAY_SECRET_KEY)
+            .update(sign.toString())
+            .digest("hex");
+
+        // Verify the authenticity of the payment
+        if (expectedSign === razorpay_signature) {
+            // Find the order by its ID and update its status
+            const order = await Order.findById(orderId);
+            if (!order) return res.status(404).json({ message: "Order not found" });
+
+            order.paymentStatus = 'Paid';
+            order.status = 'Completed';
+            await order.save();
+
+            // Clear the user's cart after the order is completed
+            const cart = await Cart.findOne({ userId: userId });
+            if (cart) {
+                cart.items = [];
+                await cart.save();
+            }
+
+            // Send order confirmation email to the user's email fetched from the database
+            await sendOrderConfirmationEmail(user.email, order);
+
+            // Respond with success
+            res.json({
+                success: true,
+                message: "Payment Successfully Verified",
+                order
+            });
+        } else {
+            // If the signature is not valid
+            res.status(400).json({ message: "Invalid Signature" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Internal Server Error" });
+        console.error(error);
+    }
+});
+
 
 module.exports = router;

@@ -6,7 +6,7 @@ const transporter = nodemailer.createTransport({
     service: process.env.EMAIL_SERVICE,
     auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // Ensure this is configured securely
+        pass: "bmaw gbjx iero myeq", // Ensure this is configured securely
     },
 });
 
@@ -31,7 +31,7 @@ const sendOrderConfirmationEmail = async (email, order) => {
               ${order.items && order.items.length > 0 
                   ? order.items.map(item => `
                       <li>
-                          ${item.productId.name} - ${item.type} x ${item.quantity} = ₹${item.totalPrice}
+                          ${item.product_id} - ${item.optionTitle} x ${item.quantity} = ₹${item.totalPrice}
                       </li>
                   `).join('')
                   : '<li>No items in the order.</li>'}

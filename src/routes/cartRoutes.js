@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const mongoose = require('mongoose');
 
 // Create or update cart
 router.post('/', async (req, res) => {
   try {
     const { userId, items } = req.body;
 
+    console
     // Find or create cart
     let cart = await Cart.findOne({ userId });
     if (!cart) {
@@ -26,6 +28,7 @@ router.post('/', async (req, res) => {
 
     // Calculate total price for each item and update cart
     for (const item of cart.items) {
+      console.log(item)
       const product = await Product.findOne({ product_id: item.product_id });
       if (!product) return res.status(404).json({ error: 'Product not found' });
 
@@ -44,13 +47,40 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get cart by user ID
+
+// Get cart by user ID without using populate
 router.get('/:userId', async (req, res) => {
   try {
-    const cart = await Cart.findOne({ userId: req.params.userId }).populate('items.product_id');
-    if (!cart) return res.status(404).json({ error: 'Cart not found' });
-    res.json(cart);
+    const { userId } = req.params;
+
+    // Assuming userId is stored as a string or ObjectId in the Cart schema
+    const cart = await Cart.findOne({ userId });
+
+    if (!cart) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+
+    // Manually fetch product details for each item in the cart using custom `product_id`
+    const cartItemsWithProductDetails = await Promise.all(
+      cart.items.map(async (item) => {
+        // Fetch product details manually from the Product model using custom `product_id`
+        const product = await Product.findOne({ product_id: item.product_id }).lean(); // Use `product_id` as a string
+
+        // Return the merged item with product details
+        return {
+          ...item.toObject(), // Convert Mongoose document to plain JS object
+          productDetails: product, // Add the product details here
+        };
+      })
+    );
+
+    // Send the cart data along with the manually fetched product details
+    res.json({
+      ...cart.toObject(),
+      items: cartItemsWithProductDetails, // Replace items with items including product details
+    });
   } catch (error) {
+    console.error('Error fetching cart:', error);
     res.status(500).json({ error: 'Error fetching cart' });
   }
 });
