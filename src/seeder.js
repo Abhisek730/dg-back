@@ -3,7 +3,7 @@ const Category = require('./models/Category'); // Adjust the path if needed
 const Product = require('./models/Product'); // Adjust the path if needed
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/ecommerce', {
+mongoose.connect('mongodb+srv://ashuagrawalksj:123@cluster0.e3je7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
